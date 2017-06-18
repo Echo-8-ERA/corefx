@@ -43,7 +43,7 @@ check_c_source_compiles(
     #include <${SOCKET_INCLUDES}>
     int main()
     {
-        struct in_pktinfo;
+        struct in_pktinfo foo;
         return 0;
     }
     "
