@@ -43,6 +43,10 @@
 #elif HAVE_SENDFILE_6
 #include <sys/uio.h>
 #endif
+#if !HAVE_IN_PKTINFO
+#include <net/if.h>
+#include <ifaddrs.h>
+#endif
 
 #if HAVE_KQUEUE
 #if KEVENT_HAS_VOID_UDATA
@@ -1179,11 +1183,22 @@ static int32_t GetIPv4PacketInformation(cmsghdr* controlMessage, IPPacketInforma
 #if HAVE_IN_PKTINFO
     packetInfo->InterfaceIndex = static_cast<int32_t>(pktinfo->ipi_ifindex);
 #else
-    // TODO (#7855): Figure out how to get interface index with in_addr.
-    // One option is http://www.unix.com/man-page/freebsd/3/if_nametoindex
-    // which requires interface name to be known.
-    // Meanwhile:
     packetInfo->InterfaceIndex = 0;
+
+    ifaddrs* ifap;
+    if (getifaddrs(&ifap) == 0)
+    {
+        for (auto *ifp = ifap; ifp; ifp = ifp->ifa_next)
+        {
+            if ((ifp->ifa_addr->sa_family == AF_INET) &&
+                (reinterpret_cast<sockaddr_in*>(ifp->ifa_addr)->sin_addr.s_addr == pktinfo->ipi_addr.s_addr))
+            {
+                packetInfo->InterfaceIndex = static_cast<int>(if_nametoindex(ifp->ifa_name));
+                break;
+            }
+        }
+        freeifaddrs(ifap);
+    }
 #endif
 
     return 1;
